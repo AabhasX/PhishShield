@@ -14,16 +14,140 @@ SUSPICIOUS_WORDS = {
     "unlock", "authenticate", "reset"
 }
 
+BRANDS = [
+    "netflix", "paypal", "google", "apple", "microsoft",
+    "amazon", "facebook", "instagram", "whatsapp",
+    "binance", "coinbase", "sbi", "icici"
+]
+
 BRAND_DOMAINS = {
+    "netflix": {"netflix.com", "www.netflix.com"},
     "paypal": {"paypal.com", "www.paypal.com"},
     "google": {"google.com", "www.google.com"},
-    "microsoft": {"microsoft.com", "www.microsoft.com"},
-    "apple": {"apple.com", "www.apple.com"},
-    "amazon": {"amazon.com", "www.amazon.com"},
-    "facebook": {"facebook.com", "www.facebook.com"},
+    "apple": {"apple.com", "www.apple.com", "icloud.com", "www.icloud.com"},
+    "microsoft": {"microsoft.com", "www.microsoft.com", "live.com", "outlook.com"},
+    "amazon": {"amazon.com", "www.amazon.com", "aws.amazon.com"},
+    "facebook": {"facebook.com", "www.facebook.com", "fb.com"},
     "instagram": {"instagram.com", "www.instagram.com"},
-    "netflix": {"netflix.com", "www.netflix.com"}
+    "whatsapp": {"whatsapp.com", "www.whatsapp.com"},
+    "binance": {"binance.com", "www.binance.com"},
+    "coinbase": {"coinbase.com", "www.coinbase.com"},
+    "sbi": {"sbi.co.in", "www.sbi.co.in", "onlinesbi.sbi", "www.onlinesbi.sbi", "statebankofindia.com"},
+    "icici": {"icicibank.com", "www.icicibank.com", "icici.com", "www.icici.com"}
 }
+
+
+def levenshtein_distance(s1, s2):
+    if len(s1) < len(s2):
+        return levenshtein_distance(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    return previous_row[-1]
+
+
+def is_official_domain(host, brand):
+    official_domains = BRAND_DOMAINS.get(brand, {f"{brand}.com", f"www.{brand}.com"})
+    return any(host == domain or host.endswith("." + domain) for domain in official_domains)
+
+
+def detect_brand_impersonation(host, path_query=""):
+    """
+    Detects typosquatting, character substitutions (leetspeak), Levenshtein edit distance,
+    or brand names combined with hyphens or deceptive keywords.
+    Returns a list of impersonated brand names.
+    """
+    if not host:
+        return []
+
+    host_lower = host.lower()
+    matched = []
+
+    # Extract domain labels and sub-tokens
+    labels = [p for p in host_lower.split(".") if p]
+    domain_labels = labels[:-1] if len(labels) > 1 else labels
+
+    tokens = set()
+    for lab in domain_labels:
+        tokens.add(lab)
+        for sub in re.split(r"[-_]", lab):
+            if sub:
+                tokens.add(sub)
+
+    for brand in BRANDS:
+        if is_official_domain(host_lower, brand):
+            continue
+
+        brand_detected = False
+
+        # 1. Exact brand appears in an unofficial domain (mixed with hyphens, deceptive keywords, or subdomains)
+        if brand in host_lower:
+            has_hyphen = "-" in host_lower or "_" in host_lower
+            has_deceptive = any(word in (host_lower + " " + path_query) for word in SUSPICIOUS_WORDS)
+            is_unrelated = not is_official_domain(host_lower, brand)
+            if has_hyphen or has_deceptive or is_unrelated:
+                brand_detected = True
+
+        # 2. Check tokens for visual leetspeak substitutions & Levenshtein edit distance
+        if not brand_detected:
+            for tok in tokens:
+                if tok == brand or tok in SUSPICIOUS_WORDS:
+                    continue
+
+                # Common visual leetspeak / character substitutions:
+                # '1' or 'i' replacing 'l' (e.g. 'netfiix' or 'paypa1')
+                # '0' replacing 'o' (e.g. 'g00gle')
+                # 'vv' replacing 'w'
+                sub_tok = tok.replace("0", "o").replace("1", "l").replace("vv", "w")
+                if sub_tok == brand:
+                    brand_detected = True
+                    break
+
+                # Direct pairwise character substitution check (e.g. 'i' replacing 'l')
+                if len(tok) == len(brand):
+                    diffs = [(t_c, b_c) for t_c, b_c in zip(tok, brand) if t_c != b_c]
+                    if diffs and all(
+                        (t_c in ("1", "i") and b_c == "l") or
+                        (t_c == "l" and b_c == "i") or
+                        (t_c == "0" and b_c == "o") or
+                        (t_c == "5" and b_c == "s") or
+                        (t_c == "v" and b_c == "u")
+                        for t_c, b_c in diffs
+                    ):
+                        brand_detected = True
+                        break
+
+                # Levenshtein distance check (edit distance 1 or 2)
+                if len(brand) >= 4 and abs(len(tok) - len(brand)) <= 2:
+                    dist = levenshtein_distance(tok, brand)
+                    if dist in (1, 2):
+                        brand_detected = True
+                        break
+                elif len(brand) <= 3 and len(tok) == len(brand):
+                    dist = levenshtein_distance(tok, brand)
+                    if dist == 1 and any(c.isdigit() or c in ("i", "l", "o") for c in tok):
+                        brand_detected = True
+                        break
+
+        # 3. Whole domain core visual substitution check
+        if not brand_detected and domain_labels:
+            domain_core = "".join(re.split(r"[-_]", "-".join(domain_labels)))
+            sub_core = domain_core.replace("0", "o").replace("1", "l").replace("vv", "w")
+            if sub_core == brand or (len(brand) >= 4 and abs(len(domain_core) - len(brand)) <= 2 and levenshtein_distance(domain_core, brand) in (1, 2)):
+                brand_detected = True
+
+        if brand_detected:
+            matched.append(brand)
+
+    return matched
 
 
 def is_ip_address(host):
@@ -239,23 +363,17 @@ def analyze_url(raw_url):
                 8
             )
 
-    # Detect possible use of a well-known brand in an unrelated domain.
-    for brand, official_domains in BRAND_DOMAINS.items():
-        if brand in host:
-            is_official = any(
-                host == domain or host.endswith("." + domain)
-                for domain in official_domains
-            )
-
-            if not is_official:
-                add_reason(
-                    f"Possible {brand} brand impersonation detected in domain",
-                    15
-                )
+    # Brand Impersonation & Typosquatting Detection
+    impersonated_brands = detect_brand_impersonation(host, path_query)
+    for brand in impersonated_brands:
+        add_reason(
+            f"Brand Impersonation / Typosquatting Detected: Domain mimics '{brand}' using character substitution or deceptive spelling (+40).",
+            40
+        )
 
     score = max(0, min(100, score))
 
-    if score >= 61:
+    if score > 60:
         status = "HIGH RISK"
     elif score >= 31:
         status = "SUSPICIOUS"
