@@ -45,6 +45,7 @@ def index():
     return render_template("index.html")
 
 @app.route("/analyze", methods=["POST"])
+@app.route("/api/scan", methods=["POST"])
 def analyze():
     data = request.get_json(silent=True) or {}
     url = (data.get("url") or "").strip()
@@ -55,6 +56,7 @@ def analyze():
     return jsonify(result)
 
 @app.route("/history")
+@app.route("/api/history")
 def history():
     conn = get_db()
     rows = conn.execute(
@@ -65,6 +67,7 @@ def history():
     return jsonify([dict(row) for row in rows])
 
 @app.route("/stats")
+@app.route("/api/stats")
 def stats():
     conn = get_db()
     total = conn.execute("SELECT COUNT(*) c FROM scans").fetchone()["c"]

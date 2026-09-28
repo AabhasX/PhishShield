@@ -1,112 +1,312 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PhishShield</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhishShield — Minimal URL Threat Detection</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<div class="bg-grid"></div>
 
-<header class="topbar">
-  <div class="brand">
-    <div class="brand-mark">P</div>
-    <div>
-      <h1>PhishShield</h1>
-      <span>Phishing URL Detection System</span>
-    </div>
+  <!-- Subtle Ambient Glow & Dot Matrix Background -->
+  <div class="bg-layer" aria-hidden="true">
+    <div class="bg-grid"></div>
+    <div class="bg-radial"></div>
   </div>
-  <div class="status-chip"><span class="dot"></span> LOCAL ANALYZER</div>
-</header>
 
-<main class="container">
-  <section class="hero">
-    <div class="hero-copy">
-      <p class="eyebrow">CYBERSECURITY PROTOTYPE</p>
-      <h2>Check a URL before you trust it.</h2>
-      <p class="subtext">
-        Analyze common phishing indicators and receive a risk score with
-        clear reasons behind the result.
+  <!-- Header / Navigation -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+        </div>
+        <div class="brand-details">
+          <span class="brand-name">PhishShield</span>
+          <span class="brand-tag">v2.0 · Linear Monolith</span>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div class="system-status">
+          <span class="status-indicator-dot"></span>
+          <span class="status-indicator-text">Heuristic Engine Active</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="container">
+
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="badge-pill">
+        <span class="pill-dot"></span>
+        <span>Zero-Trust URL Intelligence</span>
+      </div>
+
+      <h1 class="hero-title">Check a URL before you trust it.</h1>
+      <p class="hero-subtitle">
+        Inspect domain heuristics, spoofing attempts, punycode anomalies, and structural threats with real-time zero-trust analysis.
       </p>
-    </div>
 
-    <div class="scanner-card">
-      <label for="urlInput">Website URL</label>
-      <div class="input-row">
-        <input id="urlInput" type="text"
-               placeholder="https://example.com/login" autocomplete="off">
-        <button id="scanBtn" onclick="scanUrl()">Analyze URL</button>
+      <!-- Minimal Scanner Input Box -->
+      <div class="scanner-wrapper">
+        <div class="scanner-card">
+          <div class="input-container">
+            <div class="input-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+              </svg>
+            </div>
+            <input 
+              id="urlInput" 
+              type="text" 
+              placeholder="Paste suspicious or target URL (e.g. paypal-login-verify.com)..." 
+              autocomplete="off" 
+              spellcheck="false"
+            />
+            <button id="scanBtn" class="btn-primary" onclick="scanUrl()">
+              <span class="btn-text">Scan URL</span>
+              <svg class="btn-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </button>
+          </div>
+
+          <div class="scanner-footer">
+            <div class="sample-pills">
+              <span class="sample-label">Try sample:</span>
+              <button class="sample-btn" type="button" onclick="setSample('https://google.com')">google.com</button>
+              <button class="sample-btn" type="button" onclick="setSample('http://paypal-verification.com.suspicious-login.info')">paypal-spoof.info</button>
+              <button class="sample-btn" type="button" onclick="setSample('http://192.168.1.1:8080/secure/bank')">ip-login:8080</button>
+            </div>
+            <span class="input-hint">Static heuristic inspection · Remote server is not visited</span>
+          </div>
+
+          <div id="errorBox" class="error-banner hidden" role="alert"></div>
+        </div>
       </div>
-      <p class="hint">Paste a URL and click Analyze. The prototype does not visit the website.</p>
-      <div id="errorBox" class="error hidden"></div>
-    </div>
-  </section>
+    </section>
 
-  <section id="resultSection" class="result-section hidden">
-    <div class="result-main">
-      <div id="resultBadge" class="result-badge"></div>
-      <div>
-        <p class="eyebrow">ANALYSIS RESULT</p>
-        <h3 id="resultStatus">—</h3>
-        <p id="resultUrl" class="result-url">—</p>
+    <!-- Scan Result Section -->
+    <section id="resultSection" class="result-section hidden" aria-live="polite">
+      <div class="card result-card">
+        <!-- Result Header -->
+        <div class="result-header">
+          <div class="result-meta-left">
+            <div class="eyebrow-label">ANALYSIS REPORT</div>
+            <div class="result-status-wrap">
+              <span id="resultBadge" class="status-pill safe">
+                <span class="status-dot"></span>
+                <span id="resultStatus">SAFE</span>
+              </span>
+            </div>
+            <div class="result-url-wrap">
+              <span class="url-label">TARGET</span>
+              <code id="resultUrl" class="result-url-code">—</code>
+            </div>
+          </div>
+
+          <div class="result-actions-right">
+            <!-- Numeric Score Badge -->
+            <div class="score-card">
+              <div class="score-meta">
+                <span class="score-label">RISK SCORE</span>
+                <span class="score-scale">MAX 100</span>
+              </div>
+              <div class="score-display">
+                <span id="scoreValue" class="score-number">0</span>
+                <span class="score-denominator">/ 100</span>
+              </div>
+            </div>
+
+            <!-- Copy Summary Button -->
+            <button id="copySummaryBtn" class="btn-secondary" onclick="copySummary()" title="Copy analysis summary to clipboard">
+              <svg id="copyIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span id="copyBtnText">Copy Summary</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Result Details Grid -->
+        <div class="result-grid">
+          <!-- Indicators Panel -->
+          <div class="panel-box">
+            <div class="panel-header">
+              <div class="panel-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>Triggered Threat Heuristics</span>
+              </div>
+              <span id="reasonsCount" class="badge-count">0 items</span>
+            </div>
+            <div id="reasonsList" class="reasons-list">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <!-- Domain & Intelligence Panel -->
+          <div class="panel-box">
+            <div class="panel-header">
+              <div class="panel-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="2" y1="12" x2="22" y2="12"></line>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                </svg>
+                <span>Domain Host Identity</span>
+              </div>
+            </div>
+            <div class="domain-info-block">
+              <div class="domain-label">RESOLVED HOST</div>
+              <div id="hostValue" class="domain-hostname">—</div>
+            </div>
+
+            <div class="panel-footer-note">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+              <span>A SAFE rating indicates that no suspicious patterns or brand spoofing match existing rules. Always exercise caution when providing sensitive credentials.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Metrics & Dashboard Section -->
+    <section class="dashboard">
+      <div class="dashboard-header">
+        <div>
+          <div class="eyebrow-label">TELEMETRY</div>
+          <h2 class="section-title">Telemetry & Activity</h2>
+        </div>
+        <button class="btn-secondary" onclick="loadDashboard()" title="Refresh telemetry">
+          <svg class="refresh-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          <span>Refresh</span>
+        </button>
+      </div>
+
+      <!-- 4 Sleek Metric Cards -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">TOTAL SCANS</span>
+            <div class="metric-icon-box">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+              </svg>
+            </div>
+          </div>
+          <div id="totalStat" class="metric-value">0</div>
+          <div class="metric-subtext">All time evaluations</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">SAFE</span>
+            <span class="metric-indicator safe"></span>
+          </div>
+          <div id="safeStat" class="metric-value">0</div>
+          <div class="metric-subtext">Low threat probability</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">SUSPICIOUS</span>
+            <span class="metric-indicator suspicious"></span>
+          </div>
+          <div id="suspiciousStat" class="metric-value">0</div>
+          <div class="metric-subtext">Moderate risk markers</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">HIGH RISK</span>
+            <span class="metric-indicator high"></span>
+          </div>
+          <div id="highRiskStat" class="metric-value">0</div>
+          <div class="metric-subtext">Severe threat indicators</div>
+        </div>
+      </div>
+
+      <!-- History Table Panel -->
+      <div class="card table-card">
+        <div class="table-toolbar">
+          <div class="table-title">
+            <span>Scan History Log</span>
+            <span class="table-tag">Last 25 entries</span>
+          </div>
+        </div>
+        
+        <div class="table-responsive">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th scope="col" class="th-url">TARGET URL</th>
+                <th scope="col" class="th-score">RISK SCORE</th>
+                <th scope="col" class="th-status">STATUS</th>
+                <th scope="col" class="th-time">TIMESTAMP (UTC/LOCAL)</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody">
+              <tr>
+                <td colspan="4" class="empty-state">
+                  <div class="empty-wrap">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
+                    <span>No scan entries recorded yet. Enter a URL above to start.</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Clean Minimalist Footer -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-left">
+        <span class="footer-brand">PhishShield</span>
+        <span class="footer-sep">/</span>
+        <span class="footer-desc">Minimal Monochromatic Cybersecurity Intelligence</span>
+      </div>
+      <div class="footer-right">
+        <span>Inspired by Vercel & Linear Systems</span>
       </div>
     </div>
+  </footer>
 
-    <div class="score-wrap">
-      <div class="score-circle">
-        <strong id="scoreValue">0</strong><span>/ 100</span>
-      </div>
-      <div class="score-label">Risk Score</div>
-    </div>
-
-    <div class="details-grid">
-      <div class="panel">
-        <div class="panel-title">Detected Indicators</div>
-        <div id="reasonsList" class="reasons"></div>
-      </div>
-      <div class="panel">
-        <div class="panel-title">Parsed Domain</div>
-        <div id="hostValue" class="host-value">—</div>
-        <p class="panel-note">
-          A SAFE result only means that no major indicators were found by the
-          current rules; it is not a guarantee of trustworthiness.
-        </p>
-      </div>
-    </div>
-  </section>
-
-  <section class="dashboard">
-    <div class="section-head">
-      <div>
-        <p class="eyebrow">DASHBOARD</p>
-        <h3>Recent scan activity</h3>
-      </div>
-      <button class="ghost-btn" onclick="loadDashboard()">Refresh</button>
-    </div>
-
-    <div class="stats-grid">
-      <div class="stat-card"><span>Total Scans</span><strong id="totalStat">0</strong></div>
-      <div class="stat-card"><span>Safe</span><strong id="safeStat">0</strong></div>
-      <div class="stat-card"><span>Suspicious</span><strong id="suspiciousStat">0</strong></div>
-      <div class="stat-card"><span>High Risk</span><strong id="highRiskStat">0</strong></div>
-    </div>
-
-    <div class="panel table-panel">
-      <div class="panel-title">Scan History</div>
-      <div class="table-scroll">
-        <table>
-          <thead><tr><th>URL</th><th>Score</th><th>Status</th><th>Time</th></tr></thead>
-          <tbody id="historyBody">
-            <tr><td colspan="4" class="empty">No scans yet.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-</main>
-
-<footer>PhishShield · Educational cybersecurity prototype</footer>
-<script src="{{ url_for('static', filename='script.js') }}"></script>
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>
