@@ -13,6 +13,22 @@ function setSample(url) {
   scanUrl();
 }
 
+// Handle Simulation / Synthetic Mode toggle switch change
+function handleModeToggle() {
+  const toggle = document.getElementById("dnsBypassToggle");
+  const indicator = document.getElementById("modeStatusText");
+  if (!toggle || !indicator) return;
+
+  const isBypassed = toggle.checked;
+  if (isBypassed) {
+    indicator.className = "mode-indicator simulation";
+    indicator.innerHTML = `<span class="mode-dot"></span><span class="mode-text">Simulation Mode (DNS Bypassed)</span>`;
+  } else {
+    indicator.className = "mode-indicator live";
+    indicator.innerHTML = `<span class="mode-dot"></span><span class="mode-text">Public DNS Enforced</span>`;
+  }
+}
+
 // Perform URL Scan via API
 async function scanUrl() {
   const input = document.getElementById("urlInput");
@@ -32,37 +48,52 @@ async function scanUrl() {
     return;
   }
 
+  // Read DNS check mode from toggle (default: true, false when simulation toggle is ON)
+  const dnsBypassToggle = document.getElementById("dnsBypassToggle");
+  const checkDns = !(dnsBypassToggle && dnsBypassToggle.checked);
+
   // Loading state
   button.disabled = true;
   if (btnText) btnText.textContent = "Scanning...";
 
   try {
+    const payload = { url, check_dns: checkDns };
+
     // Primary endpoint /api/scan with fallback to /analyze
     let response;
     try {
       response = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url })
+        body: JSON.stringify(payload)
       });
       if (!response.ok && response.status === 404) {
         response = await fetch("/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url })
+          body: JSON.stringify(payload)
         });
       }
     } catch {
       response = await fetch("/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url })
+        body: JSON.stringify(payload)
       });
     }
 
     const data = await response.json();
     if (!response.ok) {
+      if (data && (data.exists === false || data.error === "URL Not Found")) {
+        handleUrlNotFound(data);
+        return;
+      }
       throw new Error(data.error || "Analysis failed. Please check the URL.");
+    }
+
+    if (data && (data.exists === false || data.error === "URL Not Found")) {
+      handleUrlNotFound(data);
+      return;
     }
 
     lastAnalysisResult = data;
@@ -76,6 +107,81 @@ async function scanUrl() {
     button.disabled = false;
     if (btnText) btnText.textContent = "Scan URL";
   }
+}
+
+// Handle non-existent domain / DNS resolution failure
+function handleUrlNotFound(data) {
+  const section = document.getElementById("resultSection");
+  if (section) section.classList.add("hidden");
+
+  const errorBox = document.getElementById("errorBox");
+  const notFoundMessage = "URL Not Found: Domain does not exist or cannot be reached.";
+  const detailMessage = data?.message || "The specified domain could not be resolved. Please verify the URL or ensure the host is registered.";
+
+  if (errorBox) {
+    errorBox.innerHTML = `
+      <svg class="error-banner-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+      <div class="error-banner-content">
+        <span class="error-banner-title">${escapeHtml(notFoundMessage)}</span>
+        <span class="error-banner-desc">${escapeHtml(detailMessage)}</span>
+      </div>
+    `;
+    errorBox.classList.remove("hidden");
+  }
+
+  showToast("URL Not Found", notFoundMessage);
+}
+
+// Display floating toast alert
+function showToast(title, message) {
+  const container = document.getElementById("toastContainer");
+  if (!container) return;
+
+  const toast = document.createElement("div");
+  toast.className = "toast toast-error";
+  toast.setAttribute("role", "alert");
+
+  toast.innerHTML = `
+    <div class="toast-icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+    </div>
+    <div class="toast-body">
+      <div class="toast-title">${escapeHtml(title)}</div>
+      <div class="toast-message">${escapeHtml(message)}</div>
+    </div>
+    <button class="toast-close" type="button" aria-label="Close notification">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  `;
+
+  const closeBtn = toast.querySelector(".toast-close");
+  let timerId = null;
+
+  const dismiss = () => {
+    if (timerId) clearTimeout(timerId);
+    toast.style.animation = "toastFadeOut 0.2s ease forwards";
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 200);
+  };
+
+  closeBtn.addEventListener("click", dismiss);
+  timerId = setTimeout(dismiss, 5000);
+
+  container.appendChild(toast);
 }
 
 // Render Analysis Report

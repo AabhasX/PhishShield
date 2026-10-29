@@ -83,11 +83,29 @@
             </button>
           </div>
 
+          <!-- Simulation / Synthetic Mode Toggle -->
+          <div class="scanner-controls-row">
+            <label class="toggle-control" for="dnsBypassToggle" title="Bypass live DNS lookup to demonstrate synthetic attack vectors">
+              <input type="checkbox" id="dnsBypassToggle" onchange="handleModeToggle()" />
+              <span class="toggle-switch" aria-hidden="true">
+                <span class="toggle-knob"></span>
+              </span>
+              <span class="toggle-text">
+                <span class="toggle-title">Simulation / Synthetic Mode</span>
+                <span class="toggle-tag">Bypass DNS</span>
+              </span>
+            </label>
+            <span id="modeStatusText" class="mode-indicator live">
+              <span class="mode-dot"></span>
+              <span class="mode-text">Public DNS Enforced</span>
+            </span>
+          </div>
+
           <div class="scanner-footer">
             <div class="sample-pills">
               <span class="sample-label">Try sample:</span>
               <button class="sample-btn" type="button" onclick="setSample('https://google.com')">google.com</button>
-              <button class="sample-btn" type="button" onclick="setSample('http://paypal-verification.com.suspicious-login.info')">paypal-spoof.info</button>
+              <button class="sample-btn" type="button" onclick="setSample('http://netfiix-verify.com/login')">netfiix-verify.com</button>
               <button class="sample-btn" type="button" onclick="setSample('http://192.168.1.1:8080/secure/bank')">ip-login:8080</button>
             </div>
             <span class="input-hint">Static heuristic inspection · Remote server is not visited</span>
@@ -306,6 +324,9 @@
       </div>
     </div>
   </footer>
+
+  <!-- Floating Toast Notifications -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
   <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>

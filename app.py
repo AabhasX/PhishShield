@@ -51,7 +51,14 @@ def analyze():
     url = (data.get("url") or "").strip()
     if not url:
         return jsonify({"error": "Please enter a URL."}), 400
-    result = analyze_url(url)
+
+    check_dns = data.get("check_dns", True)
+    if isinstance(check_dns, str):
+        check_dns = check_dns.lower() not in ("false", "0", "no")
+
+    result = analyze_url(url, check_dns=bool(check_dns))
+    if not result.get("exists", True):
+        return jsonify(result)
     save_scan(result)
     return jsonify(result)
 

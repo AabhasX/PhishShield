@@ -1,5 +1,7 @@
+import concurrent.futures
 import ipaddress
 import re
+import socket
 from urllib.parse import urlparse
 
 SHORTENERS = {
@@ -161,7 +163,68 @@ def is_ip_address(host):
         return False
 
 
-def analyze_url(raw_url):
+_DNS_RESOLVER_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+
+
+def extract_hostname(raw_url):
+    """
+    Extracts the normalized hostname from a raw URL string.
+    """
+    if not raw_url:
+        return ""
+    original = raw_url.strip()
+    normalized = original
+
+    if not re.match(
+        r"^[a-zA-Z][a-zA-Z0-9+.-]*://",
+        normalized
+    ):
+        normalized = "http://" + normalized
+
+    try:
+        parsed = urlparse(normalized)
+        return (parsed.hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def check_domain_exists(hostname, timeout=2.0):
+    """
+    Performs a lightweight DNS lookup using Python's built-in socket.gethostbyname
+    with a safe 2-second timeout.
+    Returns True if domain resolves to an IP address, False otherwise.
+    """
+    if not hostname:
+        return False
+
+    host = hostname.strip().strip("[]").strip()
+    if not host or host == "0.0.0.0":
+        return False
+
+    try:
+        host = host.encode("idna").decode("ascii")
+    except Exception:
+        pass
+
+    def _resolve():
+        old_timeout = socket.getdefaulttimeout()
+        try:
+            socket.setdefaulttimeout(timeout)
+            return socket.gethostbyname(host)
+        finally:
+            socket.setdefaulttimeout(old_timeout)
+
+    try:
+        future = _DNS_RESOLVER_POOL.submit(_resolve)
+        ip = future.result(timeout=timeout)
+        if not ip or ip == "0.0.0.0":
+            return False
+        return True
+    except (socket.gaierror, socket.herror, socket.timeout, concurrent.futures.TimeoutError, TimeoutError, OSError, UnicodeError):
+        return False
+
+
+def analyze_url(raw_url, check_dns=True):
     original = raw_url.strip()
     normalized = original
 
@@ -175,6 +238,12 @@ def analyze_url(raw_url):
         parsed = urlparse(normalized)
         host = (parsed.hostname or "").lower()
     except ValueError:
+        if check_dns:
+            return {
+                "exists": False,
+                "error": "URL Not Found",
+                "message": "The specified domain could not be resolved. Please verify the URL or ensure the host is registered."
+            }
         return {
             "url": original,
             "host": "Unable to parse domain",
@@ -182,6 +251,15 @@ def analyze_url(raw_url):
             "status": "HIGH RISK",
             "reasons": ["Malformed or invalid URL structure"]
         }
+
+    # DNS Resolution Check
+    if check_dns:
+        if not host or not check_domain_exists(host):
+            return {
+                "exists": False,
+                "error": "URL Not Found",
+                "message": "The specified domain could not be resolved. Please verify the URL or ensure the host is registered."
+            }
 
     path_query = f"{parsed.path} {parsed.query}".lower()
 
@@ -386,6 +464,7 @@ def analyze_url(raw_url):
         )
 
     return {
+        "exists": True,
         "url": original,
         "host": host or "Unable to parse domain",
         "score": score,
